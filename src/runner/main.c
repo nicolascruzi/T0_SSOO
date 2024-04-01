@@ -16,6 +16,7 @@ int main(int argc, char const *argv[])
 
 	/*Mostramos el archivo de input en consola*/
 	printf("Cantidad de lineas: %d\n", input_file->len);
+	printf("Probandoooo");
 	for (int i = 0; i < input_file->len; ++i)
 	{
 		
