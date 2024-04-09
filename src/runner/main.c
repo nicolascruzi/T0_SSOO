@@ -118,7 +118,6 @@ void handle_signal(int signal_number) {
                     processes[i].execution_time = difftime(processes[i].final_time, processes[i].initial_time);
                     processes[i].status = WIFEXITED(child_status) ? WEXITSTATUS(child_status) : WTERMSIG(child_status);
                     child_finished = 1;
-                    
                     break;
                 }
             }
@@ -187,14 +186,10 @@ int main(int argc, char const *argv[])
 	for (int i = 0; i < input_file->len; ++i)
 	{
         
-        printf("Antes del while\n");
+        
         while (current_processes >= amount) {
-            printf("Esperando a que un proceso hijo termine...\n");
-            pause();
-            printf("Saliendo del while\n");
+            pause();  
         }
-        
-        
         
         struct timespec start_time, end_time;
         clock_gettime(CLOCK_MONOTONIC, &start_time); // Iniciar el temporizador
@@ -203,8 +198,7 @@ int main(int argc, char const *argv[])
 
         current_processes++;
         programs_executed++;
-        printf("Procesos en ejecución: %d\n", current_processes);
-        printf("Procesos ejecutados: %d\n", programs_executed);
+       
 
         processes[i].id = i;
         strcpy(processes[i].path, input_file->lines[i][1]);
