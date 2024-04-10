@@ -22,6 +22,7 @@ int terminated_children = 0;
 int find_wait_all = 0;
 int usar_alarm_maxtime = 0;
 int usar_alarm_timeout = 0;
+int cantidad_wait_all = 0;
 
 typedef struct {
     int id;
@@ -66,7 +67,7 @@ void handle_signal(int signal_number) {
             }}
             
            
-       }else if (usar_alarm_timeout == 1){
+       else if (usar_alarm_timeout == 1){
             printf("Timeout alcanzado. Terminando todos los procesos hijos en ejecución...\n");
             usar_alarm_timeout = 0;
             //matar a los procesos que estan siendo procesados
@@ -76,7 +77,7 @@ void handle_signal(int signal_number) {
                     kill(processes[i].pid, SIGKILL);
                 }
             }
-       }
+       }}
         
         else if (signal_number == SIGTSTP) {
             printf("Recibido SIGTSTP. Terminando todos los procesos hijos...\n");
@@ -155,14 +156,17 @@ void write_csv(const char *output_filename) {
     }
     for (int i = 0; i < cantidad_procesos; ++i) {
         int execution_time_sec = (int)processes[i].execution_time;
-        fprintf(output_file, "%s,%d,%d\n", processes[i].path, execution_time_sec, processes[i].status);
+        if (strcmp(processes[i].path, "wait_all") != 0) {
+            fprintf(output_file, "%s,%d,%d\n", processes[i].path, execution_time_sec, processes[i].status);
+        }
+        
     }
     fclose(output_file);
 }
 
 int main(int argc, char const *argv[])
 {
-    
+    printf("Entreeee\n");
 	///////////////Lectura del input*//////////////////
 	char *file_name = (char *)argv[1];
 	InputFile *input_file = read_file(file_name);
@@ -199,18 +203,19 @@ int main(int argc, char const *argv[])
     const char **program_names = (const char **)malloc(input_file->len * sizeof(const char *));
     double *execution_times = (double *)malloc(input_file->len * sizeof(double));
     int *statuses = (int *)malloc(input_file->len * sizeof(int));
-    processes = (Process*)malloc(cantidad_procesos * sizeof(Process));
+    processes = (Process*)malloc(input_file->len * sizeof(Process));
     int programs_executed = 0; 
 
 
     ///////////Recorrer el input, encontrar el wait y activar alarma////////////////
     for (int j = 0; j <input_file->len; ++j){
             if (!find_wait_all && strcmp(input_file->lines[j][0], "-1") == 0 && strcmp(input_file->lines[j][1], "wait_all") == 0) {
-            printf("Comando 'wait all' detectado.\n\n");
+            cantidad_wait_all++;
+            printf("Comando 'wait all' detectado.\n");
             int wait_timeout = atoi(input_file->lines[j][2]);
-            printf("Alarma encendida en %d segundos\n", wait_timeout);
+            printf("Alarma encendida en %d segundos\n\n", wait_timeout);
             usar_alarm_timeout = 1;
-            alarm(10);
+            alarm(wait_timeout);
             find_wait_all = 1;
             break;
             }
@@ -222,8 +227,6 @@ int main(int argc, char const *argv[])
         while (current_processes >= amount) {  
             pause();     
         }
-        
-
         
         struct timespec start_time, end_time;
         clock_gettime(CLOCK_MONOTONIC, &start_time); // Iniciar el temporizador
@@ -259,18 +262,21 @@ int main(int argc, char const *argv[])
             args[num_args + 1] = NULL;
             processes[i].argv = args;
             
-            
+          
+            if (strcmp(input_file->lines[i][0], "-1") != 0){
+                    execvp(input_file->lines[i][1], args);
+                perror("execvp");
+                exit(1);
+            }
 
-            execvp(input_file->lines[i][1], args);
-            perror("execvp");
-            exit(1);
+            
 }
         //////////// Si nos devuelve otro numero, entonces estamos en el proceso padre////////////////
         else {    
             child_pids[i] = pid;
         }}
     
-    while (terminated_children < cantidad_procesos) {
+    while (terminated_children < cantidad_procesos-cantidad_wait_all) {
         printf("Esperando a que todos los procesos hijos terminen...\n");
         sleep(1);
     }
