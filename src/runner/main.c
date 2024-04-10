@@ -19,6 +19,9 @@ int current_processes = 0;
 int processes_left;
 int amount;
 int terminated_children = 0;
+int find_wait_all = 0;
+int usar_alarm_maxtime = 0;
+int usar_alarm_timeout = 0;
 
 typedef struct {
     int id;
@@ -38,28 +41,43 @@ Process *processes = NULL;
 
 void handle_signal(int signal_number) {
     if (signal_number == SIGALRM) {
-       
-        // Enviar SIGINT a todos los procesos hijos
-        printf("Frenando procesos con SIGINT...\n");
-        for (int i = 0; i < cantidad_procesos; ++i) {
-            if (processes[i].pid > 0) { 
-                printf("Frenando proceso %d\n", processes[i].pid);
-               kill(processes[i].pid, SIGINT);
+       if (usar_alarm_maxtime == 1){
+            // Enviar SIGINT a todos los procesos hijos
+            printf("Frenando procesos con SIGINT...\n");
+            for (int i = 0; i < cantidad_procesos; ++i) {
+                if (processes[i].pid > 0) { 
+                    printf("Frenando proceso %d\n", processes[i].pid);
+                kill(processes[i].pid, SIGINT);
+                }
             }
-        }
-        printf("Comienzo en conteo de 10 segundos..........\n");
-         int remaining_time = 10;
-        while (remaining_time >= 0 ) {
-            sleep(1);
-            remaining_time--;
-        }
-        printf("Matando procesos con SIGTERM...\n");
-        //enviar in sigterm a todos los procesos
-        for (int i = 0; i < cantidad_procesos; ++i) {
-            if (processes[i].pid > 0) { // Asegurarse de que el pid es válido    
-                kill(processes[i].pid, SIGTERM);
+            printf("Comienzo en conteo de 10 segundos..........\n");
+            int remaining_time = 10;
+            while (remaining_time >= 0 ) {
+                sleep(1);
+                remaining_time--;
             }
-        }}
+            printf("Matando procesos con SIGTERM...\n");
+            //enviar in sigterm a todos los procesos
+            for (int i = 0; i < cantidad_procesos; ++i) {
+                if (processes[i].pid > 0) { // Asegurarse de que el pid es válido    
+                    kill(processes[i].pid, SIGTERM);
+                }
+             usar_alarm_maxtime = 0;
+            }}
+            
+           
+       }else if (usar_alarm_timeout == 1){
+            printf("Timeout alcanzado. Terminando todos los procesos hijos en ejecución...\n");
+            usar_alarm_timeout = 0;
+            //matar a los procesos que estan siendo procesados
+            for (int i = 0; i < cantidad_procesos; ++i) {
+                if (processes[i].pid > 0) { // Asegurarse de que el pid es válido  
+                    printf("Matando proceso  de PID: %d\n", processes[i].pid);  
+                    kill(processes[i].pid, SIGKILL);
+                }
+            }
+       }
+        
         else if (signal_number == SIGTSTP) {
             printf("Recibido SIGTSTP. Terminando todos los procesos hijos...\n");
 
@@ -166,6 +184,7 @@ int main(int argc, char const *argv[])
     ///////////// Establecer alarma para max_timeout si es proporcionado////////////////
     if (max_timeout > 0) {
         printf("Setting alarm for %d seconds...\n", max_timeout);
+        usar_alarm_maxtime = 1;
         alarm(max_timeout);
     }
     
@@ -182,8 +201,20 @@ int main(int argc, char const *argv[])
     int *statuses = (int *)malloc(input_file->len * sizeof(int));
     processes = (Process*)malloc(cantidad_procesos * sizeof(Process));
     int programs_executed = 0; 
-    
-    
+
+
+    ///////////Recorrer el input, encontrar el wait y activar alarma////////////////
+    for (int j = 0; j <input_file->len; ++j){
+            if (!find_wait_all && strcmp(input_file->lines[j][0], "-1") == 0 && strcmp(input_file->lines[j][1], "wait_all") == 0) {
+            printf("Comando 'wait all' detectado.\n\n");
+            int wait_timeout = atoi(input_file->lines[j][2]);
+            printf("Alarma encendida en %d segundos\n", wait_timeout);
+            usar_alarm_timeout = 1;
+            alarm(10);
+            find_wait_all = 1;
+            break;
+            }
+        }
     
 	//////////////Iteramos sobre el archivo de input////////////////
 	for (int i = 0; i < input_file->len; ++i)
@@ -191,6 +222,8 @@ int main(int argc, char const *argv[])
         while (current_processes >= amount) {  
             pause();     
         }
+        
+
         
         struct timespec start_time, end_time;
         clock_gettime(CLOCK_MONOTONIC, &start_time); // Iniciar el temporizador
@@ -200,16 +233,12 @@ int main(int argc, char const *argv[])
         current_processes++;
         programs_executed++;
        
-
         processes[i].id = i;
         strcpy(processes[i].path, input_file->lines[i][1]);
         processes[i].status = 0;
         processes[i].initial_time = start_time.tv_sec;
         processes[i].final_time = 0;
         processes[i].pid = pid;
-
-        
-        
     
         /////////// Si nos devuelve -1,  existe un error////////////////
         if (pid == -1) {
