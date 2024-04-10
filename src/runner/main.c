@@ -23,6 +23,7 @@ int find_wait_all = 0;
 int usar_alarm_maxtime = 0;
 int usar_alarm_timeout = 0;
 int cantidad_wait_all = 0;
+int ctrl_z = 0;
 
 typedef struct {
     int id;
@@ -81,16 +82,16 @@ void handle_signal(int signal_number) {
         
         else if (signal_number == SIGTSTP) {
             printf("Recibido SIGTSTP. Terminando todos los procesos hijos...\n");
-
+            ctrl_z = 1;
             // Primero, intentamos terminar los procesos de forma amigable con SIGTERM
             for (int i = 0; i < cantidad_procesos; ++i) {
                 if (processes[i].pid > 0) {
                     printf("Enviando SIGTERM al proceso %d\n", processes[i].pid);
-                    kill(processes[i].pid, SIGTERM);
+                    kill(processes[i].pid, SIGCONT);
                 }
             }
 
-            // Damos hasta 10 segundos para que los procesos hijos finalicen amigablemente
+            
             sleep(10);
 
             // Comprobamos si los procesos hijos terminaron después del SIGTERM
@@ -105,8 +106,8 @@ void handle_signal(int signal_number) {
             }
 
         // Después de manejar la terminación de todos los procesos hijos, escribe las estadísticas y finaliza el programa
-        write_csv("output.csv"); // Asegúrate de que argv[2] sea accesible aquí, o utiliza una variable global para el nombre del archivo
-        exit(0);
+        write_csv("output.csv");
+        
         }
     else if (signal_number == SIGINT) {
         
@@ -166,7 +167,7 @@ void write_csv(const char *output_filename) {
 
 int main(int argc, char const *argv[])
 {
-    printf("Entreeee\n");
+  
 	///////////////Lectura del input*//////////////////
 	char *file_name = (char *)argv[1];
 	InputFile *input_file = read_file(file_name);
@@ -276,8 +277,8 @@ int main(int argc, char const *argv[])
             child_pids[i] = pid;
         }}
     
-    while (terminated_children < cantidad_procesos-cantidad_wait_all) {
-        printf("Esperando a que todos los procesos hijos terminen...\n");
+    while (terminated_children < cantidad_procesos-cantidad_wait_all && ctrl_z == 0) {
+        
         sleep(1);
     }
  
