@@ -16,7 +16,7 @@ volatile sig_atomic_t time_up = 0;
 volatile sig_atomic_t child_finished = 0;
 int cantidad_procesos;
 int current_processes = 0;
-int processes_left = 0;
+int processes_left;
 int amount;
 int terminated_children = 0;
 
@@ -43,11 +43,16 @@ void handle_signal(int signal_number) {
         printf("Frenando procesos con SIGINT...\n");
         for (int i = 0; i < cantidad_procesos; ++i) {
             if (processes[i].pid > 0) { 
-                printf("Matando proceso %d\n", processes[i].pid);
+                printf("Frenando proceso %d\n", processes[i].pid);
                kill(processes[i].pid, SIGINT);
             }
         }
-        sleep(10);
+        printf("Comienzo en conteo de 10 segundos..........\n");
+         int remaining_time = 10;
+        while (remaining_time >= 0 ) {
+            sleep(1);
+            remaining_time--;
+        }
         printf("Matando procesos con SIGTERM...\n");
         //enviar in sigterm a todos los procesos
         for (int i = 0; i < cantidad_procesos; ++i) {
@@ -101,13 +106,11 @@ void handle_signal(int signal_number) {
         
         int child_status;
         pid_t terminated_pid;
-        while ((terminated_pid = waitpid(-1, &child_status, 0)) > 0) {
+        while ((terminated_pid = waitpid(-1, &child_status, WNOHANG)) > 0) {
             current_processes--;
             terminated_children++;
             printf("Child process with PID %d has finished.\n", terminated_pid);
             
-           
-        
             struct timespec end_time;
 
             clock_gettime(CLOCK_MONOTONIC, &end_time);
@@ -185,10 +188,8 @@ int main(int argc, char const *argv[])
 	//////////////Iteramos sobre el archivo de input////////////////
 	for (int i = 0; i < input_file->len; ++i)
 	{
-        
-        
-        while (current_processes >= amount) {
-            pause();  
+        while (current_processes >= amount) {  
+            pause();     
         }
         
         struct timespec start_time, end_time;
@@ -239,28 +240,10 @@ int main(int argc, char const *argv[])
         else {    
             child_pids[i] = pid;
         }}
-
-    if (amount == 1) {
-        while (!child_finished) {
-            pause();
-        }
-    } else { 
-        for (int i = 0; i < cantidad_procesos; ++i) {
-            if (child_pids[i] != 0) {
-                int child_status;
-                
-                waitpid(child_pids[i], &child_status, 0);
-            }
-        }
-    }
-
     
-    
-    for (int i = 0; i < cantidad_procesos; ++i) {
-        printf("Proceso PID %d\n", processes[i].pid);
-        printf("Proceso con tiempo de ejecución: %f\n", processes[i].execution_time);
-        printf("Tiemnpo de primer proceso: %ld\n", processes[i].initial_time);
-        printf("Tiemnpo de finalización: %ld\n", processes[i].final_time);
+    while (terminated_children < cantidad_procesos) {
+        printf("Esperando a que todos los procesos hijos terminen...\n");
+        sleep(1);
     }
  
     write_csv("output.csv");
